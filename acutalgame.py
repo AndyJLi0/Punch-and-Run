@@ -1,5 +1,4 @@
 import pygame
-from pygame_functions import *
 from pygame.locals import *
 
 # Machine vision imports
@@ -10,20 +9,26 @@ from sys import exit
 
 pygame.init()
 
-SCREEN_WIDTH = 1000
+SCREEN_WIDTH = 500
 SCREEN_HEIGHT = 800
 
-WEBCAM_WIDTH = 200
-WEBCAM_HEIGHT = 80
+WEBCAM_WIDTH = int(SCREEN_WIDTH / 3)
+WEBCAM_HEIGHT = int(SCREEN_HEIGHT / 5)
+
+#PUNCH_DELAY = ___
+#PUNCH_DISTANCE = ___
+
+GAME_HAS_STARTED = FALSE
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-screenSize(SCREEN_WIDTH, SCREEN_HEIGHT)
-setBackgroundImage("./assets/background.jpg")
-pygame.display.set_caption("Running Game")
+pygame.display.set_caption("Banana Punch")
 
 fps = 30
 clock = pygame.time.Clock()
 
+
+### LOAD IMAGES AND SPIRTES
+bg = pygame.image.load('./assets/background.jpg')
 ### MACHINE VISION WINDOW STUFF
 
 cap = cv2.VideoCapture(0) # Some devices, 0 opens a mobile device :(
@@ -34,9 +39,14 @@ mpDraw = mp.solutions.drawing_utils # Handles drawing lines across each landmark
 
 webcam_surface = pygame.Surface((WEBCAM_WIDTH, WEBCAM_HEIGHT))
 
-run = True
+while not GAME_HAS_STARTED:
+    # Do some stuff to detect a hand, start the game when the hand is detected
 
-while run:
+while GAME_HAS_STARTED:
+    # draw background
+    screen.blit(bg, (0,0))
+
+    # draw and scroll the ground
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
@@ -58,6 +68,8 @@ while run:
     if results.multi_hand_landmarks:
         for handLandmarks in results.multi_hand_landmarks:
             mpDraw.draw_landmarks(img, handLandmarks, mpHands.HAND_CONNECTIONS)
+            knuckle = handLandmarks.landmark[9] # Corresponds to the 9th landmark
+            print(knuckle)
 
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) ## Since pygame and opencv uses different rgb channels
 
@@ -65,7 +77,7 @@ while run:
     pygame.surfarray.blit_array(webcam_surface, cv2image.swapaxes(0, 1)) # Does some swapping so that the format matches that of pygame               
 
     # Attach the webcam_surface to the display, using block image transfer
-    screen.blit(webcam_surface, (0, 0))
+    screen.blit(webcam_surface, (SCREEN_WIDTH - WEBCAM_WIDTH, 0)) # Put the webcam in the top right
 
     pygame.display.update()
 
