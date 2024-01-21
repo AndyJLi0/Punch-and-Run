@@ -7,7 +7,10 @@ import mediapipe as mp
 import time
 from sys import exit
 
-pygame.init()
+import numpy as np
+import mediapipe as mp
+import tensorflow as tf
+from tensorflow.keras.models import load_model
 
 SCREEN_WIDTH = 500
 SCREEN_HEIGHT = 800
@@ -15,38 +18,93 @@ SCREEN_HEIGHT = 800
 WEBCAM_WIDTH = int(SCREEN_WIDTH / 2)
 WEBCAM_HEIGHT = int(SCREEN_HEIGHT / 5)
 
-#PUNCH_DELAY = ___
-#PUNCH_DISTANCE = ___
+PUNCH_DELAY = 0.4
+current_time = 1.0
 
-GAME_HAS_STARTED = True
+PUNCH_DISTANCE = 0
 
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Banana Punch")
+GAME_HAS_STARTED = False
 
 fps = 30
 clock = pygame.time.Clock()
 
-
-### LOAD IMAGES AND SPIRTES
-bg = pygame.image.load('./assets/background.jpg')
-ground = pygame.image.load('./assets/ground.png')
 ### MACHINE VISION WINDOW STUFF
 
 cap = cv2.VideoCapture(0) # Some devices, 0 opens a mobile device :(
 
 mpHands = mp.solutions.hands
-hands = mpHands.Hands()
+hands = mpHands.Hands(max_num_hands=1, min_detection_confidence=0.5, min_tracking_confidence = 0.5)
 mpDraw = mp.solutions.drawing_utils # Handles drawing lines across each landmark point
 
 webcam_surface = pygame.Surface((WEBCAM_WIDTH, WEBCAM_HEIGHT))
 
-while not GAME_HAS_STARTED:
-    # Do some stuff to detect a hand, start the game when the hand is detected
-    print('hi')
-while GAME_HAS_STARTED:
-    # draw background
-    screen.blit(bg, (0,0))
+# Load the gesture recognizer model
+model = load_model('mp_hand_gesture')
 
+# Load class names
+f = open('gesture.names', 'r')
+classNames = f.read().split('\n')
+f.close()
+print(classNames)
+
+while not GAME_HAS_STARTED:
+
+    # Do some stuff to detect a hand, start the game when the hand is detected
+    success, img = cap.read()
+    x, y, z = img.shape
+
+    # Flip the frame vertically
+    img = cv2.flip(img, 1)
+    imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    result = hands.process(imgRGB)
+
+    className = ''
+
+    # post process the result
+    if result.multi_hand_landmarks:
+        landmarks = []
+        for handslms in result.multi_hand_landmarks:
+            for lm in handslms.landmark:
+                # print(id, lm)
+                lmx = int(lm.x * x)
+                lmy = int(lm.y * y)
+
+                landmarks.append([lmx, lmy])
+
+            # Drawing landmarks on frames
+            mpDraw.draw_landmarks(img, handslms, mpHands.HAND_CONNECTIONS)
+
+            # Predict gesture
+            prediction = model.predict([landmarks])
+            # print(prediction)
+            classID = np.argmax(prediction)
+            className = classNames[classID]
+    
+    if className == 'thumbs up':
+        GAME_HAS_STARTED = True
+
+    # Show the final output
+    cv2.imshow("Output", img) 
+    cv2.waitKey(1)
+
+hands = mpHands.Hands()
+cv2.destroyAllWindows()
+
+print("HAME HAS STARTED")
+
+# Initialize pygame
+pygame.init()
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Banana Punch")
+
+# LOAD IMAGES AND SPIRTES
+bg = pygame.image.load('./assets/background.jpg')
+ground = pygame.image.load('./assets/ground.png')
+
+while GAME_HAS_STARTED:
+    screen.blit(bg, (0,0))
+    
     #draw ground (MAKE SCROLLING AFTER)
     screen.blit(ground, (0,630))
 
@@ -68,12 +126,18 @@ while GAME_HAS_STARTED:
     imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     results = hands.process(imgRGB) # Getting the solution
 
+    current_time = current_time + 0.01
+    
     # Extract the results, each hand
     if results.multi_hand_landmarks:
         for handLandmarks in results.multi_hand_landmarks:
             mpDraw.draw_landmarks(img, handLandmarks, mpHands.HAND_CONNECTIONS)
             knuckle = handLandmarks.landmark[9] # Corresponds to the 9th landmark
-            print(knuckle)
+
+            if knuckle.z <= PUNCH_DISTANCE and current_time > PUNCH_DELAY:
+                # change this to attack later
+                print("Punch")
+                current_time = 0
 
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) ## Since pygame and opencv uses different rgb channels
 
@@ -86,6 +150,3 @@ while GAME_HAS_STARTED:
     pygame.display.update()
     
     clock.tick(fps)
-
-    if cv2.waitKey(1) == ord('q'):
-        break
