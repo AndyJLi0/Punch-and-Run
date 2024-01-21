@@ -12,13 +12,13 @@ pygame.init()
 SCREEN_WIDTH = 500
 SCREEN_HEIGHT = 800
 
-WEBCAM_WIDTH = int(SCREEN_WIDTH / 3)
+WEBCAM_WIDTH = int(SCREEN_WIDTH / 2)
 WEBCAM_HEIGHT = int(SCREEN_HEIGHT / 5)
 
 #PUNCH_DELAY = ___
 #PUNCH_DISTANCE = ___
 
-GAME_HAS_STARTED = FALSE
+GAME_HAS_STARTED = True
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Banana Punch")
@@ -29,6 +29,7 @@ clock = pygame.time.Clock()
 
 ### LOAD IMAGES AND SPIRTES
 bg = pygame.image.load('./assets/background.jpg')
+ground = pygame.image.load('./assets/ground.png')
 ### MACHINE VISION WINDOW STUFF
 
 cap = cv2.VideoCapture(0) # Some devices, 0 opens a mobile device :(
@@ -41,10 +42,13 @@ webcam_surface = pygame.Surface((WEBCAM_WIDTH, WEBCAM_HEIGHT))
 
 while not GAME_HAS_STARTED:
     # Do some stuff to detect a hand, start the game when the hand is detected
-
+    print('hi')
 while GAME_HAS_STARTED:
     # draw background
     screen.blit(bg, (0,0))
+
+    #draw ground (MAKE SCROLLING AFTER)
+    screen.blit(ground, (0,630))
 
     # draw and scroll the ground
     for event in pygame.event.get():
@@ -80,5 +84,8 @@ while GAME_HAS_STARTED:
     screen.blit(webcam_surface, (SCREEN_WIDTH - WEBCAM_WIDTH, 0)) # Put the webcam in the top right
 
     pygame.display.update()
-
+    
     clock.tick(fps)
+
+    if cv2.waitKey(1) == ord('q'):
+        break
