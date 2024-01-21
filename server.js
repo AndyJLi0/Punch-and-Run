@@ -14,3 +14,25 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
+
+
+// const db = new sqlite3.Database('mydatabase.db', (err) => {
+//     if (err) {
+//         console.error(err.message);
+//     }
+//     console.log('Connected to the SQLite database.');
+
+//     db.run(`CREATE TABLE IF NOT EXISTS users (
+//         email TEXT PRIMARY KEY
+//     )`);
+
+//     db.run(`CREATE TABLE IF NOT EXISTS locations (
+//         location_id INTEGER PRIMARY KEY AUTOINCREMENT,
+//         user_email TEXT,
+//         start TEXT,
+//         end TEXT,
+//         distance REAL,
+//         time TEXT,
+//         FOREIGN KEY (user_email) REFERENCES users (email)
+//     )`);
+// });
