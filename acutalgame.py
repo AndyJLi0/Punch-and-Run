@@ -99,6 +99,8 @@ while not GAME_HAS_STARTED:
         GAME_HAS_STARTED = True
 
     # Show the final output
+    cv2.putText(img, 'Give a Thumbs-Up to start the game!', (100, 100), cv2.FONT_HERSHEY_PLAIN, 
+                   5, (0,255,0), 7)
     cv2.imshow("Output", img) 
     cv2.waitKey(1)
 
