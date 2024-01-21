@@ -15,7 +15,9 @@ from tensorflow.keras.models import load_model
 # To generate a wall 
 import random
 
-WALL_SPEED = 8 
+TOTAL_HITS = 0
+
+WALL_SPEED = 12 
 WALL_CONSTANT = 0.03 # The higher the number, the more frequent walls spawn
 
 SCREEN_WIDTH = 500
@@ -27,13 +29,23 @@ WEBCAM_HEIGHT = int(SCREEN_HEIGHT / 5)
 PUNCH_DELAY = 0.4
 current_time = 1.0
 
-PUNCH_DISTANCE = 0
+PUNCH_DISTANCE = 0.1
+PUNCH_DURATION = 4
 
 GAME_HAS_STARTED = False
+
+STRIKE_DISTANCE = 20
+
+# counter for punch anmiation
+is_punching = False
 
 fps = 30
 clock = pygame.time.Clock()
 wall = None
+
+pygame.font.init()
+
+font = pygame.font.Font(None, 36)
 
 # Load sprite sheet
 sprite_sheet = pygame.image.load('./spirtes/BananaManSpriteSheet240by192.png')  # Replace with the path to your sprite sheet
@@ -41,6 +53,21 @@ sprite_width, sprite_height = 190, 190
 frames = [sprite_sheet.subsurface((i * sprite_width, 0, sprite_width, sprite_height)) for i in range(4)]
 frame_index = 0
 character_rect = pygame.Rect(SCREEN_WIDTH / 3 - 160, SCREEN_HEIGHT - 300, sprite_width, sprite_height)
+
+# Loading the punch sprite sheet
+punch_sprite_sheet = pygame.image.load('./spirtes/bananaPunchSpriteSheet.png')  # Replace with the path to your sprite sheet
+punch_sprite_width, punch_sprite_height = 190, 190 
+punch_frames = [punch_sprite_sheet.subsurface((i * sprite_width, 0, sprite_width, sprite_height)) for i in range(4)]
+punch_frame_index = 0
+# punch_character_rect = pygame.Rect(SCREEN_WIDTH / 3 - 160, SCREEN_HEIGHT - 300, sprite_width, sprite_height)
+
+# Set up the title overlay
+overlay_image = cv2.imread('./assets/title.png', cv2.IMREAD_UNCHANGED)
+overlay_alpha = overlay_image[:, :, 3]
+
+# LOADING STATIC IMAGES
+bg = pygame.image.load('./assets/background.jpg')
+ground = pygame.image.load('./assets/ground.png')
 
 ### MACHINE VISION WINDOW STUFF
 
@@ -98,6 +125,7 @@ while not GAME_HAS_STARTED:
     if className == 'thumbs up':
         GAME_HAS_STARTED = True
 
+
     # Show the final output
     cv2.putText(img, 'Give a Thumbs-Up to start the game!', (100, 100), cv2.FONT_HERSHEY_PLAIN, 
                    5, (0,255,0), 7)
@@ -107,10 +135,12 @@ while not GAME_HAS_STARTED:
 hands = mpHands.Hands()
 cv2.destroyAllWindows()
 
+
 # Initialize pygame
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Banana Punch")
+punch_frame = 4
 
 class Wall:
     def __init__(self, x, y, image_path):
@@ -124,12 +154,17 @@ class Wall:
         self.rect.x -= self.speed
 
     def hasHitPlayer(self):
-        return self.rect.x <= SCREEN_WIDTH / 3 # REPLACE WITH WHEREEVER THE PLAYER IS
-
-# LOAD IMAGES AND SPIRTES
-bg = pygame.image.load('./assets/background.jpg')
-ground = pygame.image.load('./assets/ground.png')
-
+        return self.rect.x <= SCREEN_WIDTH / 3 and not is_punching # REPLACE WITH WHEREEVER THE PLAYER IS
+    
+    def withinStrikingRangeOfBanana(self):
+        return self.rect.x - (SCREEN_WIDTH / 3 + 95) <= STRIKE_DISTANCE
+    
+    def swap_to_broken(self):
+        # Load the broken wall image and update the image attribute
+        self.image = pygame.image.load('./assets/brokenwall.png').convert()
+    
+    
+# Generate the image of the wall
 wall = Wall(SCREEN_WIDTH, 0, './assets/wall.jpg')
 
 while GAME_HAS_STARTED:
@@ -137,17 +172,10 @@ while GAME_HAS_STARTED:
     #draw ground (MAKE SCROLLING AFTER)
     screen.blit(ground, (0,630))
 
-    # Draw the current frame
-    screen.blit(frames[frame_index], character_rect.topleft)
-
-    # Update the frame index for the next iteration
-    frame_index = (frame_index + 1) % len(frames)
-
     if wall:
         wall.update()
         screen.blit(wall.image, wall.rect)
         if wall.hasHitPlayer():
-            print("I've hit a player")
             wall = None
     elif random.random() < WALL_CONSTANT:
         wall = Wall(SCREEN_WIDTH, 0, './assets/wall.jpg')
@@ -178,21 +206,53 @@ while GAME_HAS_STARTED:
             mpDraw.draw_landmarks(img, handLandmarks, mpHands.HAND_CONNECTIONS)
             knuckle = handLandmarks.landmark[9] # Corresponds to the 9th landmark
 
-            if knuckle.z <= PUNCH_DISTANCE and current_time > PUNCH_DELAY:
+            if abs(knuckle.z) >= PUNCH_DISTANCE and current_time > PUNCH_DELAY: # Not actually PUNCH_DISTANCE CUZ BIGGER NUMBER IS CLOSER TO THE SCREEN
                 # change this to attack later
-
+                print('This is the z value: ', knuckle.z)
                 # See if the wall is close enough to the object
-
-                
+                if wall:
+                    print(wall.rect.x)
+                    print(wall.withinStrikingRangeOfBanana())
+                    if wall.withinStrikingRangeOfBanana():
+                        TOTAL_HITS += 1
+                        ## CALL SWAP IMG FUNCTION HERE
+                        wall.swap_to_broken()
+                        wall
+                        
+                is_punching = True
+                punch_counter = PUNCH_DURATION
                 current_time = 0
+                
+    # LOGIC FOR WHICH SPRITE TO DRAW   
+    if is_punching: 
+        if punch_counter > 0:
+            screen.blit(punch_frames[frame_index], character_rect.topleft)
+            punch_counter -= 1
+        else:
+            # reset punching state
+            is_punching = False
+    else:
+        # draw walking sprite
+        screen.blit(frames[frame_index], character_rect.topleft)
+    # inc frame_index
+    frame_index = (frame_index + 1 ) % 4
 
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) ## Since pygame and opencv uses different rgb channels
-
     cv2image = cv2.resize(img, (WEBCAM_WIDTH, WEBCAM_HEIGHT))
     pygame.surfarray.blit_array(webcam_surface, cv2image.swapaxes(0, 1)) # Does some swapping so that the format matches that of pygame               
 
     # Attach the webcam_surface to the display, using block image transfer
     screen.blit(webcam_surface, (SCREEN_WIDTH - WEBCAM_WIDTH, 0)) # Put the webcam in the top right
+
+    text = font.render("Total Walls Broken: " + str(TOTAL_HITS), True, (255, 255, 255))
+    wall_pov = font.render("Wall POV: ", True, (255, 255, 25) )
+
+    text_rect = text.get_rect(topleft=(0, 0))
+    text_rect2 = wall_pov.get_rect(topleft = (100, 20))
+
+    screen.blit(text, text_rect)
+    screen.blit(wall_pov, text_rect2)
+
 
     pygame.display.update()
     
