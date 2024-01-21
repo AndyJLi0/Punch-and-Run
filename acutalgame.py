@@ -12,6 +12,12 @@ import mediapipe as mp
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 
+# To generate a wall 
+import random
+
+WALL_SPEED = 8 
+WALL_CONSTANT = 0.03 # The higher the number, the more frequent walls spawn
+
 SCREEN_WIDTH = 500
 SCREEN_HEIGHT = 800
 
@@ -27,6 +33,14 @@ GAME_HAS_STARTED = False
 
 fps = 30
 clock = pygame.time.Clock()
+wall = None
+
+# Load sprite sheet
+sprite_sheet = pygame.image.load('./spirtes/BananaManSpriteSheet240by192.png')  # Replace with the path to your sprite sheet
+sprite_width, sprite_height = 190, 190 
+frames = [sprite_sheet.subsurface((i * sprite_width, 0, sprite_width, sprite_height)) for i in range(4)]
+frame_index = 0
+character_rect = pygame.Rect(SCREEN_WIDTH / 3 - 160, SCREEN_HEIGHT - 300, sprite_width, sprite_height)
 
 ### MACHINE VISION WINDOW STUFF
 
@@ -91,22 +105,50 @@ while not GAME_HAS_STARTED:
 hands = mpHands.Hands()
 cv2.destroyAllWindows()
 
-print("HAME HAS STARTED")
-
 # Initialize pygame
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Banana Punch")
 
+class Wall:
+    def __init__(self, x, y, image_path):
+        self.image = pygame.image.load(image_path).convert()
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.speed = WALL_SPEED
+
+    def update(self):
+        self.rect.x -= self.speed
+
+    def hasHitPlayer(self):
+        return self.rect.x <= SCREEN_WIDTH / 3 # REPLACE WITH WHEREEVER THE PLAYER IS
+
 # LOAD IMAGES AND SPIRTES
 bg = pygame.image.load('./assets/background.jpg')
 ground = pygame.image.load('./assets/ground.png')
 
+wall = Wall(SCREEN_WIDTH, 0, './assets/wall.jpg')
+
 while GAME_HAS_STARTED:
     screen.blit(bg, (0,0))
-    
     #draw ground (MAKE SCROLLING AFTER)
     screen.blit(ground, (0,630))
+
+    # Draw the current frame
+    screen.blit(frames[frame_index], character_rect.topleft)
+
+    # Update the frame index for the next iteration
+    frame_index = (frame_index + 1) % len(frames)
+
+    if wall:
+        wall.update()
+        screen.blit(wall.image, wall.rect)
+        if wall.hasHitPlayer():
+            print("I've hit a player")
+            wall = None
+    elif random.random() < WALL_CONSTANT:
+        wall = Wall(SCREEN_WIDTH, 0, './assets/wall.jpg')
 
     # draw and scroll the ground
     for event in pygame.event.get():
@@ -136,7 +178,10 @@ while GAME_HAS_STARTED:
 
             if knuckle.z <= PUNCH_DISTANCE and current_time > PUNCH_DELAY:
                 # change this to attack later
-                print("Punch")
+
+                # See if the wall is close enough to the object
+
+                
                 current_time = 0
 
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) ## Since pygame and opencv uses different rgb channels

@@ -38,6 +38,7 @@ while True:
 
     # Get hand landmark prediction
     result = hands.process(framergb)
+
     
     className = ''
 
